@@ -383,6 +383,13 @@ PROTOBUF_NOINLINE const char* TcParser::FastEndG2(PROTOBUF_TC_PARAM_DECL) {
 template <typename TagType, bool group_coding, bool aux_is_table>
 inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularParseMessageAuxImpl(
     PROTOBUF_TC_PARAM_DECL) {
+  /*
+  const uint32_t decoded_tag = data.tag();
+  const uint32_t decoded_wiretype = decoded_tag & 7;
+  if (decoded_wiretype == WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+    PROTOBUF_MUSTTAIL return MpPackedFixed(PROTOBUF_TC_PARAM_PASS);
+  }*/
+
   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
   }
@@ -2326,43 +2333,36 @@ PROTOBUF_NOINLINE const char* TcParser::MpMessage(PROTOBUF_TC_PARAM_DECL) {
   const uint16_t type_card = entry.type_card;
   const uint16_t card = type_card & field_layout::kFcMask;
 
+  const uint32_t decoded_tag = data.tag();
+  const uint32_t decoded_wiretype = decoded_tag & 7;
+
   // Check for repeated parsing:
   if (card == field_layout::kFcRepeated) {
-    const uint16_t rep = type_card & field_layout::kRepMask;
-    switch (rep) {
-      case field_layout::kRepMessage:
+    switch (decoded_wiretype) {
+      case WireFormatLite::WIRETYPE_LENGTH_DELIMITED:
         PROTOBUF_MUSTTAIL return MpRepeatedMessageOrGroup<is_split, false>(
             PROTOBUF_TC_PARAM_PASS);
-      case field_layout::kRepGroup:
+      case WireFormatLite::WIRETYPE_START_GROUP:
         PROTOBUF_MUSTTAIL return MpRepeatedMessageOrGroup<is_split, true>(
             PROTOBUF_TC_PARAM_PASS);
       default:
         PROTOBUF_MUSTTAIL return table->fallback(PROTOBUF_TC_PARAM_PASS);
     }
   }
-
-  const uint32_t decoded_tag = data.tag();
-  const uint32_t decoded_wiretype = decoded_tag & 7;
   const uint16_t rep = type_card & field_layout::kRepMask;
-  const bool is_group = rep == field_layout::kRepGroup;
-
-  // Validate wiretype:
-  switch (rep) {
-    case field_layout::kRepMessage:
-      if (decoded_wiretype != WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
-        goto fallback;
-      }
-      break;
-    case field_layout::kRepGroup:
-      if (decoded_wiretype != WireFormatLite::WIRETYPE_START_GROUP) {
-        goto fallback;
-      }
-      break;
-    default: {
-    fallback:
-      PROTOBUF_MUSTTAIL return table->fallback(PROTOBUF_TC_PARAM_PASS);
-    }
+  // note that we solely rely on wiretype for parsing messages (schema ignored)
+  const bool is_group =
+      decoded_wiretype == WireFormatLite::WIRETYPE_START_GROUP;
+  // handle the aberrant case where we just have a sole EGROUP
+  if (decoded_wiretype == WireFormatLite::WIRETYPE_END_GROUP) {
+    PROTOBUF_MUSTTAIL return table->fallback(PROTOBUF_TC_PARAM_PASS);
   }
+
+// only validate schema for lazy fields
+
+  // remark: initially tried invoking FastGdS1 upon seeing wiretype_group but
+  // got unit test failures
+  // PROTOBUF_MUSTTAIL return FastGdS1(PROTOBUF_TC_PARAM_PASS);
 
   const bool is_oneof = card == field_layout::kFcOneof;
   bool need_init = false;
