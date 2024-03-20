@@ -2157,6 +2157,7 @@ inline const EnumDescriptor* GetEnumDescriptor<::google::protobuf::compiler::Cod
 }  // namespace protobuf
 }  // namespace google
 
+
 // @@protoc_insertion_point(global_scope)
 
 #include "google/protobuf/port_undef.inc"

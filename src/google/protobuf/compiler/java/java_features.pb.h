@@ -401,6 +401,7 @@ inline const EnumDescriptor* GetEnumDescriptor<::pb::JavaFeatures_Utf8Validation
 }  // namespace protobuf
 }  // namespace google
 
+
 // @@protoc_insertion_point(global_scope)
 
 #include "google/protobuf/port_undef.inc"
